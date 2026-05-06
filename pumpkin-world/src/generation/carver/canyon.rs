@@ -243,7 +243,34 @@ impl CanyonCarver {
                 let zd = (world_z as f64 + 0.5 - z) / horizontal_radius;
 
                 if xd * xd + zd * zd < 1.0 {
+                    // Use the heightmap to find the top of any motion-blocking block
+                    // (includes liquids) in this column. Catches ocean water above max_y.
+                    let col_top = chunk.top_motion_blocking_block_height_exclusive(
+                        world_x,
+                        world_z,
+                    );
+
+                    let scan_top = col_top.min(chunk.bottom_y() as i32 + chunk.height() as i32 - 1);
+                    let has_liquid = (min_y + 1..=scan_top).any(|world_y| {
+                        let local_y = world_y - chunk.bottom_y() as i32;
+                        if local_y < 0 || local_y >= chunk.height() as i32 {
+                            return false;
+                        }
+                        let state_id = chunk.get_block_state_raw(world_x & 15, local_y, world_z & 15);
+                        let block = pumpkin_data::Block::from_state_id(state_id);
+                        block.id == pumpkin_data::Block::WATER.id
+                            || block.id == pumpkin_data::Block::LAVA.id
+                    });
+
+                    if has_liquid {
+                        continue;
+                    }
+
                     for world_y in (min_y + 1..=max_y).rev() {
+                        let local_y = world_y - chunk.bottom_y() as i32;
+                        let state_id = chunk.get_block_state_raw(world_x & 15, local_y, world_z & 15);
+                        let block = pumpkin_data::Block::from_state_id(state_id);
+
                         let yd = (world_y as f64 - 0.5 - y) / vertical_radius;
 
                         if !self.should_skip(
@@ -256,7 +283,18 @@ impl CanyonCarver {
                         ) && !chunk.carving_mask.get(world_x, world_y, world_z)
                         {
                             chunk.carving_mask.set(world_x, world_y, world_z);
-                            self.carve_block(chunk, config, world_x, world_y, world_z);
+
+                            if config.replaceable.1.contains(&block.id) {
+                                let lava_y = config.lava_level.get_y(chunk.bottom_y() as i16, chunk.height());
+
+                                if world_y <= lava_y {
+                                    let lava = BlockState::from_id(pumpkin_data::Block::LAVA.default_state.id);
+                                    chunk.set_block_state(world_x & 15, local_y, world_z & 15, lava);
+                                } else {
+                                    let air = BlockState::from_id(pumpkin_data::Block::AIR.default_state.id);
+                                    chunk.set_block_state(world_x & 15, local_y, world_z & 15, air);
+                                }
+                            }
                         }
                     }
                 }
@@ -278,40 +316,5 @@ impl CanyonCarver {
             return true;
         }
         (xd * xd + zd * zd) * width_factor_per_height[y_index - 1] as f64 + yd * yd / 6.0 >= 1.0
-    }
-
-    fn carve_block(
-        &self,
-        chunk: &mut ProtoChunk,
-        config: &CarverConfig,
-        x: i32,
-        y: i32,
-        z: i32,
-    ) -> bool {
-        let local_y = y - chunk.bottom_y() as i32;
-        let state_id = chunk.get_block_state_raw(x & 15, local_y, z & 15);
-        let block = pumpkin_data::Block::from_state_id(state_id);
-
-        if block.id == pumpkin_data::Block::WATER.id || block.id == pumpkin_data::Block::LAVA.id {
-            return false;
-        }
-
-        if config.replaceable.1.contains(&block.id) {
-            let air = BlockState::from_id(pumpkin_data::Block::AIR.default_state.id);
-            let lava = BlockState::from_id(pumpkin_data::Block::LAVA.default_state.id);
-
-            let lava_y = config
-                .lava_level
-                .get_y(chunk.bottom_y() as i16, chunk.height());
-
-            if y <= lava_y {
-                chunk.set_block_state(x & 15, local_y, z & 15, lava);
-            } else {
-                chunk.set_block_state(x & 15, local_y, z & 15, air);
-            }
-
-            return true;
-        }
-        false
     }
 }

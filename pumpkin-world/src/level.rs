@@ -95,6 +95,9 @@ pub struct Level {
     pub shut_down_chunk_system: AtomicBool,
     pub should_save: AtomicBool,
     pub should_unload: AtomicBool,
+    /// When true, the schedule thread will skip saving chunks to disk on shutdown.
+    /// Useful for testing where the world is wiped on every startup.
+    pub skip_save_on_shutdown: AtomicBool,
     /// Number of ticks between autosave checks. If 0, autosave is disabled.
     pub autosave_ticks: u64,
 
@@ -207,6 +210,7 @@ impl Level {
             shut_down_chunk_system: AtomicBool::new(false),
             should_save: AtomicBool::new(false),
             should_unload: AtomicBool::new(false),
+            skip_save_on_shutdown: AtomicBool::new(false),
             autosave_ticks: level_config.autosave_ticks,
             pending_entity_generations: pending_entity_generations.clone(),
             level_channel: level_channel.clone(),

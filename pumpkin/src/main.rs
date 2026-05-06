@@ -80,6 +80,23 @@ async fn main() {
     let basic_config = BasicConfiguration::load(&config_dir);
     let advanced_config = AdvancedConfiguration::load(&config_dir);
 
+    // Clear the world directory for fresh testing every run
+    let world_path = basic_config.get_world_path();
+    let fresh_world = if world_path.exists() {
+        match std::fs::remove_dir_all(&world_path) {
+            Ok(()) => {
+                info!("Cleaned world directory for fresh testing.");
+                true
+            }
+            Err(e) => {
+                warn!("Failed to clean world directory: {}", e);
+                false
+            }
+        }
+    } else {
+        true // No existing world — still a fresh run
+    };
+
     let vanilla_data = VanillaData::load();
 
     pumpkin::init_logger(&advanced_config);
@@ -121,6 +138,16 @@ async fn main() {
     });
 
     let pumpkin_server = PumpkinServer::new(basic_config, advanced_config, vanilla_data).await;
+
+    // If we wiped the world, skip the chunk-save on shutdown — it would just be discarded anyway.
+    if fresh_world {
+        let worlds = pumpkin_server.server.worlds.load();
+        for world in worlds.iter() {
+            world.level.skip_save_on_shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        info!("Fresh world mode: chunk save on shutdown is disabled.");
+    }
+
     let plugin_wait_time = pumpkin_server.init_plugins().await;
 
     let time_elapsed = time.elapsed().saturating_sub(plugin_wait_time);

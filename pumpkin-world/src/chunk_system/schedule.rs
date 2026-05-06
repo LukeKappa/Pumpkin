@@ -569,6 +569,9 @@ impl GenerationSchedule {
                         self.chunk_map.remove(&pos);
                     }
                 }
+            } else {
+                // Chunk is currently occupied by a generation task, retry unloading later
+                self.unload_chunks.insert(pos);
             }
         }
         if chunks.is_empty() {
@@ -934,8 +937,12 @@ impl GenerationSchedule {
                 self.save_all_chunk(false);
             }
             if level.shut_down_chunk_system.load(Relaxed) {
-                info!("Saving chunks before shutdown...");
-                self.save_all_chunk(true);
+                if level.skip_save_on_shutdown.load(Relaxed) {
+                    info!("Skipping chunk save on shutdown (skip_save_on_shutdown=true).");
+                } else {
+                    info!("Saving chunks before shutdown...");
+                    self.save_all_chunk(true);
+                }
                 break;
             }
 
@@ -958,8 +965,12 @@ impl GenerationSchedule {
             'out2: while let Some(task) = self.queue.pop() {
                 if level.shut_down_chunk_system.load(Relaxed) {
                     self.queue.push(task);
-                    info!("Shutdown detected during task processing, saving chunks...");
-                    self.save_all_chunk(true);
+                    if level.skip_save_on_shutdown.load(Relaxed) {
+                        info!("Shutdown detected during task processing, skipping save.");
+                    } else {
+                        info!("Shutdown detected during task processing, saving chunks...");
+                        self.save_all_chunk(true);
+                    }
                     break 'out2;
                 }
 
