@@ -87,3 +87,30 @@ impl LogLevel {
 pub fn log(level: LogLevel, message: &str) {
     wit::pumpkin::plugin::logging::log(level.to_wit(), message);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_log_edge_cases() {
+        let levels = [
+            LogLevel::Trace,
+            LogLevel::Debug,
+            LogLevel::Info,
+            LogLevel::Warn,
+            LogLevel::Error,
+        ];
+
+        for level in levels {
+            log(level, &format!("Testing log level: {:?}", level));
+        }
+
+        // Test empty message
+        log(LogLevel::Info, "");
+
+        // Test very large message
+        let large_message = "a".repeat(10_000);
+        log(LogLevel::Info, &large_message);
+    }
+}
