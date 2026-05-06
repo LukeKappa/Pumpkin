@@ -53,7 +53,11 @@ impl BedrockClient {
             .await;
             return;
         }
-        let server = player.world().server.upgrade().unwrap();
+        let server = player
+            .world()
+            .server
+            .upgrade()
+            .expect("Server dropped while handling chunk radius request");
 
         let view_distance =
             chunk_radius.clamp(2, NonZeroI32::from(server.basic_config.view_distance).get());
@@ -174,7 +178,9 @@ impl BedrockClient {
         packet: pumpkin_protocol::bedrock::server::player_auth_input::PlayerBlockAction,
     ) {
         use pumpkin_protocol::bedrock::server::player_action::Action as PlayerAction;
-        let action = PlayerAction::try_from(packet.action.0).unwrap();
+        let Ok(action) = PlayerAction::try_from(packet.action.0) else {
+            return;
+        };
         self.handle_player_action(
             player,
             server,

@@ -210,7 +210,7 @@ impl LivingEntity {
             .broadcast_packet_all(&CTakeItemEntity::new(
                 item.entity_id.into(),
                 self.entity.entity_id.into(),
-                stack_amount.try_into().unwrap(),
+                pumpkin_protocol::codec::var_int::VarInt(stack_amount.try_into().unwrap_or(i32::MAX)),
             ))
             .await;
     }
@@ -348,7 +348,7 @@ impl LivingEntity {
         attribute: &Attributes,
         f: F,
     ) {
-        let mut map = self.attributes.write().unwrap();
+        let mut map = self.attributes.write().expect("attributes lock poisoned");
 
         let inst = map.entry(attribute.id).or_insert_with(|| {
             let base = self
@@ -357,8 +357,8 @@ impl LivingEntity {
                 .attributes
                 .iter()
                 .find(|a| a.0.id == attribute.id)
-                .unwrap()
-                .1;
+                .map(|a| a.1)
+                .unwrap_or(attribute.default_value);
             AttributeInstance::new(base)
         });
 
@@ -369,7 +369,7 @@ impl LivingEntity {
     /// Returns the computed value for `attribute` using the local instance, falling back
     /// to `attribute.default_value` if no local instance exists.
     pub fn get_attribute_value(&self, attribute: &Attributes) -> f64 {
-        let map = self.attributes.read().unwrap();
+        let map = self.attributes.read().expect("attributes lock poisoned");
         map.get(&attribute.id)
             .map_or(attribute.default_value, AttributeInstance::value)
     }
@@ -377,7 +377,7 @@ impl LivingEntity {
     /// Returns the base attribute value for `attribute` for this entity's type.
     pub fn get_attribute_base(&self, attribute: &Attributes) -> f64 {
         // Check the local base value first (could be modified)
-        let map = self.attributes.read().unwrap();
+        let map = self.attributes.read().expect("attributes lock poisoned");
         if let Some(instance) = map.get(&attribute.id) {
             return instance.base_value;
         }
@@ -388,14 +388,14 @@ impl LivingEntity {
             .attributes
             .iter()
             .find(|a| a.0.id == attribute.id)
-            .unwrap()
-            .1
+            .map(|a| a.1)
+            .unwrap_or(attribute.default_value)
     }
 
     /// Update or insert the base value for an attribute on this entity.
     /// If the attribute doesn't exist locally yet, it will be inserted.
     pub fn set_attribute_base(&self, attribute: &Attributes, new_base: f64) {
-        let mut map = self.attributes.write().unwrap();
+        let mut map = self.attributes.write().expect("attributes lock poisoned");
         if let Some(inst) = map.get_mut(&attribute.id) {
             inst.base_value = new_base;
             inst.dirty.store(true, Ordering::Relaxed);
@@ -1622,7 +1622,7 @@ impl LivingEntity {
         let slot = self
             .equipment_slots
             .get(&PlayerInventory::OFF_HAND_SLOT)
-            .unwrap();
+            .expect("Missing OFF_HAND_SLOT in equipment_slots");
         self.entity_equipment.lock().await.get(slot)
     }
 
@@ -1642,7 +1642,7 @@ impl LivingEntity {
         let slot = self
             .equipment_slots
             .get(&PlayerInventory::OFF_HAND_SLOT)
-            .unwrap();
+            .expect("Missing OFF_HAND_SLOT in equipment_slots");
         self.entity_equipment.lock().await.get(slot)
     }
 
@@ -1828,12 +1828,10 @@ impl NBTStorage for LivingEntity {
                 let mut active_effects = self.active_effects.lock().await;
                 let effects_len = nbt.get_u32().unwrap_or(0);
                 for _ in 0..effects_len {
-                    let effect = Effect::create_from_nbt(nbt).await;
-                    if effect.is_none() {
+                    let Some(mut effect) = Effect::create_from_nbt(nbt).await else {
                         warn!("Unable to read effect from nbt");
                         continue;
-                    }
-                    let mut effect = effect.unwrap();
+                    };
                     effect.blend = true; // TODO: change, is taken from effect give command
                     active_effects.insert(effect.effect_type, effect);
                 }
@@ -1935,7 +1933,7 @@ impl EntityBase for LivingEntity {
             self.last_damage_taken.store(amount);
             let damage_amount = damage_amount.max(0.0);
 
-            let config = &world.server.upgrade().unwrap().advanced_config.pvp;
+            let config = &world.server.upgrade().expect("Server dropped while applying damage to entity").advanced_config.pvp;
 
             if config.hurt_animation {
                 let entity_id = VarInt(self.entity.entity_id);

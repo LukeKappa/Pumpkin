@@ -59,7 +59,7 @@ fn resolve_sender_world(
 ) -> std::sync::Arc<World> {
     sender
         .world()
-        .unwrap_or_else(|| server.worlds.load().first().unwrap().clone())
+        .unwrap_or_else(|| server.worlds.load().first().expect("Server must have at least one world").clone())
 }
 
 struct EntitiesToEntityExecutor;

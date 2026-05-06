@@ -78,8 +78,10 @@ impl Packet {
             return Ok(None);
         }
 
-        // Read the 4-byte length header (little-endian)
-        let len_bytes: [u8; 4] = incoming[0..4].try_into().unwrap();
+        // SAFETY: slice is exactly 4 bytes long (validated by `incoming.len() < 4` above)
+        let len_bytes: [u8; 4] = incoming[0..4]
+            .try_into()
+            .expect("slice is exactly 4 bytes; qed");
         let size = i32::from_le_bytes(len_bytes);
 
         // An RCON packet size includes: ID(4) + Type(4) + Body(n) + Null(1) + EmptyStringNull(1).
@@ -97,8 +99,17 @@ impl Packet {
         }
 
         // We have the full packet. Parse it synchronously using fixed slices.
-        let id = i32::from_le_bytes(incoming[4..8].try_into().unwrap());
-        let ty = i32::from_le_bytes(incoming[8..12].try_into().unwrap());
+        // SAFETY: indices 4..8 and 8..12 are within total_packet_len which was bounds-checked above
+        let id = i32::from_le_bytes(
+            incoming[4..8]
+                .try_into()
+                .expect("slice is exactly 4 bytes; qed"),
+        );
+        let ty = i32::from_le_bytes(
+            incoming[8..12]
+                .try_into()
+                .expect("slice is exactly 4 bytes; qed"),
+        );
 
         // Calculate body boundaries (starts after len, id, and ty -> 4+4+4 = 12)
         // Ends 2 bytes before the total length (excluding the two trailing null bytes)

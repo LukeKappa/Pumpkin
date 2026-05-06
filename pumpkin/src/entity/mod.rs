@@ -883,12 +883,14 @@ impl Entity {
         if movement.get_axis(Axis::Y) != 0.0 {
             let mut max_time = 1.0;
             let mut positions = block_positions.into_iter();
-            let (mut collisions_len, mut position) = positions.next().unwrap();
+            let (mut collisions_len, mut position) = positions.next()
+                .expect("block_positions must have at least one entry when collisions is non-empty");
             let mut supporting_block_pos = None;
 
             for (i, inert_box) in collisions.iter().enumerate() {
                 if i == collisions_len {
-                    (collisions_len, position) = positions.next().unwrap();
+                    (collisions_len, position) = positions.next()
+                        .expect("block_positions must be in sync with collisions groups");
                 }
 
                 if let Some(collision_time) = bounding_box.calculate_collision_time(
@@ -1819,14 +1821,14 @@ impl Entity {
             && !portal_world
                 .server
                 .upgrade()
-                .unwrap()
+                .expect("server dropped during portal check")
                 .basic_config
                 .allow_nether)
             || (portal_world.dimension == Dimension::THE_END
                 && !portal_world
                     .server
                     .upgrade()
-                    .unwrap()
+                    .expect("server dropped during portal check")
                     .basic_config
                     .allow_end)
         {
@@ -2302,7 +2304,8 @@ impl Entity {
                 if is_within_view_distance(chunk_pos, center, view_distance) {
                     let mut buf = Vec::new();
                     for m in meta {
-                        m.write(&mut buf, &client.version.load()).unwrap();
+                        m.write(&mut buf, &client.version.load())
+                            .expect("metadata write to Vec<u8> is infallible");
                     }
                     buf.put_u8(255);
                     player
@@ -2680,7 +2683,8 @@ impl Entity {
             };
 
             if let Some(player) = passenger.get_player() {
-                let id = teleport_id.unwrap();
+                // teleport_id is Some when the passenger is a player (set above in the same branch)
+                let id = teleport_id.expect("teleport_id must be Some for a player passenger; qed");
                 player.living_entity.entity.set_pos(dismount_pos);
                 // Update awaiting_teleport with the real dismount position
                 *player.awaiting_teleport.lock().await = Some((id.into(), dismount_pos));
@@ -2797,8 +2801,13 @@ impl NBTStorage for Entity {
 
     fn read_nbt_non_mut<'a>(&'a self, nbt: &'a mut PNbtCompound) -> NbtFuture<'a, ()> {
         Box::pin(async {
-            let _id = nbt.get_string().unwrap();
-            let _uuid = nbt.get_uuid().unwrap();
+            // Entity ID and UUID must be present in valid NBT — skip gracefully if malformed
+            let Ok(_id) = nbt.get_string() else {
+                return;
+            };
+            let Ok(_uuid) = nbt.get_uuid() else {
+                return;
+            };
 
             let x = nbt.get_f64().unwrap_or(0.0);
             let y = nbt.get_f64().unwrap_or(0.0);

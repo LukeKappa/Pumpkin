@@ -194,7 +194,7 @@ struct PotentialCalculator(std::sync::Mutex<Vec<PointCharge>>);
 
 impl Clone for PotentialCalculator {
     fn clone(&self) -> Self {
-        Self(std::sync::Mutex::new(self.0.lock().unwrap().clone()))
+        Self(std::sync::Mutex::new(self.0.lock().expect("PotentialCalculator lock poisoned").clone()))
     }
 }
 
@@ -203,14 +203,14 @@ impl PotentialCalculator {
         if charge != 0. {
             self.0
                 .lock()
-                .unwrap()
+                .expect("PotentialCalculator lock poisoned")
                 .push(PointCharge(pos.to_f64(), charge));
         }
     }
 
     pub fn remove_charge(&self, pos: &BlockPos, charge: f64) {
         if charge != 0. {
-            let mut charges = self.0.lock().unwrap();
+            let mut charges = self.0.lock().expect("PotentialCalculator lock poisoned");
             let pos_f64 = pos.to_f64();
             if let Some(idx) = charges.iter().position(|c| c.0 == pos_f64 && c.1 == charge) {
                 charges.swap_remove(idx);
@@ -222,7 +222,7 @@ impl PotentialCalculator {
             return 0.;
         }
         let mut sum: f64 = 0.;
-        let charges = self.0.lock().unwrap();
+        let charges = self.0.lock().expect("PotentialCalculator lock poisoned");
         for i in charges.iter() {
             sum += i.get_potential_change(pos);
         }
@@ -493,7 +493,7 @@ pub fn get_random_pos_within(
 
     let x = (chunk_pos.x << 4) + rng.next_bounded_i32(16);
     let z = (chunk_pos.y << 4) + rng.next_bounded_i32(16);
-    let temp_y = chunk.heightmap.lock().unwrap().get(
+    let temp_y = chunk.heightmap.lock().expect("heightmap lock poisoned").get(
         ChunkHeightmapType::WorldSurface,
         x,
         z,
@@ -535,9 +535,13 @@ pub async fn spawn_category_for_position(
                 random_group_size = rng().random_range(spawner.min_count..=spawner.max_count);
             }
 
-            let spawner = current_spawner.unwrap();
-            let entity_type =
-                &EntityType::from_name(spawner.r#type.strip_prefix("minecraft:").unwrap()).unwrap();
+            let spawner = current_spawner.expect("spawner set above in same iteration");
+            let entity_key = spawner.r#type.strip_prefix("minecraft:").unwrap_or(spawner.r#type);
+            let Some(entity_type) = EntityType::from_name(entity_key) else {
+                inc += 1;
+                continue;
+            };
+            let entity_type = &entity_type;
 
             new_pos = adjust_spawn_position(world, new_pos, entity_type).await;
 

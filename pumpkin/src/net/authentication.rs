@@ -122,7 +122,7 @@ pub fn validate_textures(property: &Property, config: &TextureConfig) -> Result<
 }
 
 pub fn is_texture_url_valid(url: &Uri, config: &TextureConfig) -> Result<(), TextureError> {
-    let scheme = url.scheme().unwrap();
+    let scheme = url.scheme().expect("parsed URI must have scheme");
     if !config
         .allowed_url_schemes
         .iter()
@@ -130,7 +130,7 @@ pub fn is_texture_url_valid(url: &Uri, config: &TextureConfig) -> Result<(), Tex
     {
         return Err(TextureError::DisallowedUrlScheme(scheme.to_string()));
     }
-    let domain = url.authority().unwrap();
+    let domain = url.authority().expect("parsed URI must have authority/domain");
     if !config
         .allowed_url_domains
         .iter()

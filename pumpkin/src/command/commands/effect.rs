@@ -88,16 +88,12 @@ impl CommandExecutor for GiveExecutor {
             let mut successes = 0;
 
             for target in targets {
-                if target.living_entity.has_effect(effect).await
-                    && target
-                        .living_entity
-                        .get_effect(effect)
-                        .await
-                        .unwrap()
-                        .amplifier
-                        >= amplifier
-                {
-                } else {
+                let should_add = match target.living_entity.get_effect(effect).await {
+                    Some(existing_effect) => existing_effect.amplifier < amplifier,
+                    None => true,
+                };
+
+                if should_add {
                     target
                         .add_effect(Effect {
                             effect_type: effect,

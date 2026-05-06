@@ -260,7 +260,8 @@ impl JavaClient {
     pub async fn enqueue_packet<P: ClientPacket>(&self, packet: &P) {
         let mut buf = Vec::new();
         let writer = &mut buf;
-        self.write_packet(packet, writer).unwrap();
+        self.write_packet(packet, writer)
+            .expect("failed to write packet to buffer");
         self.enqueue_packet_data(buf.into()).await;
     }
 
@@ -336,7 +337,8 @@ impl JavaClient {
     pub async fn send_packet_now<P: ClientPacket>(&self, packet: &P) {
         let mut packet_buf = Vec::new();
         let writer = &mut packet_buf;
-        self.write_packet(packet, writer).unwrap();
+        self.write_packet(packet, writer)
+            .expect("failed to write packet to buffer");
         self.send_packet_now_data(packet_buf.into()).await;
     }
 
@@ -539,9 +541,8 @@ impl JavaClient {
                     for packet in &packet_batch {
                         if let Err(err) = writer.write_packet(packet.data.clone()).await {
                             failed = true;
-                            // It is expected that the packet will fail if we are closed
                             if !close_token.is_cancelled() {
-                                warn!("Failed to send packet to client {id}: {err}");
+                                debug!("Failed to send packet to client {id}: {err}");
                             }
                             break;
                         }
@@ -550,7 +551,7 @@ impl JavaClient {
                     if !failed && let Err(err) = writer.flush().await {
                         failed = true;
                         if !close_token.is_cancelled() {
-                            warn!("Failed to flush packet batch for client {id}: {err}");
+                            debug!("Failed to flush packet batch for client {id}: {err}");
                         }
                     }
                     failed

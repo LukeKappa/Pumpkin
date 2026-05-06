@@ -56,7 +56,9 @@ impl LANBroadcast {
             .await
             .expect("Unable to bind to address");
 
-        socket.set_broadcast(true).unwrap();
+        if let Err(e) = socket.set_broadcast(true) {
+            warn!("LAN broadcast: failed to enable SO_BROADCAST — discovery may not work: {e}");
+        }
 
         let mut interval = time::interval(Duration::from_millis(1500));
 

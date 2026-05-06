@@ -268,14 +268,14 @@ impl ProtoChunk {
     ) -> Self {
         let mut proto_chunk = Self::new(chunk_data.x, chunk_data.z, generator);
 
-        proto_chunk.light = chunk_data.light_engine.lock().unwrap().clone();
+        proto_chunk.light = chunk_data.light_engine.lock().expect("light_engine lock poisoned").clone();
         proto_chunk.blending_data = chunk_data.blending_data.clone();
 
         let section_data = &chunk_data.section;
-        let heightmap_data = chunk_data.heightmap.lock().unwrap();
+        let heightmap_data = chunk_data.heightmap.lock().expect("heightmap lock poisoned");
 
-        let block_sections_guard = section_data.block_sections.read().unwrap();
-        let biome_sections_guard = section_data.biome_sections.read().unwrap();
+        let block_sections_guard = section_data.block_sections.read().expect("block_sections lock poisoned");
+        let biome_sections_guard = section_data.biome_sections.read().expect("biome_sections lock poisoned");
 
         for (section_idx, block_palette) in block_sections_guard.iter().enumerate() {
             let section_base_y = section_idx as i32 * 16;

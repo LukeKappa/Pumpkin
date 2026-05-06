@@ -1442,7 +1442,7 @@ impl World {
             let delta = Vector3::new(rand_value & 15, rand_value >> 16 & 15, rand_value >> 8 & 15);
             let random_pos = Vector3::new(
                 chunk_pos.x << 4,
-                chunk.heightmap.lock().unwrap().get(
+                chunk.heightmap.lock().expect("heightmap lock poisoned").get(
                     MotionBlocking,
                     chunk_pos.x << 4,
                     chunk_pos.y << 4,
@@ -1541,7 +1541,7 @@ impl World {
                 chunk
                     .heightmap
                     .lock()
-                    .unwrap()
+                    .expect("heightmap lock poisoned")
                     .get(MotionBlocking, x, z, self.min_y)
             })
             .await
@@ -1851,7 +1851,7 @@ impl World {
                 entity_id,
                 base_config.hardcore,
                 dimensions,
-                base_config.max_players.try_into().unwrap(),
+                base_config.max_players.try_into().expect("max_players fits in i32"),
                 base_config.view_distance.get().into(), //  TODO: view distance
                 base_config.simulation_distance.get().into(), // TODO: sim view dinstance
                 false,
@@ -2094,7 +2094,7 @@ impl World {
                         MetaDataType::BYTE,
                         config.skin_parts,
                     );
-                    meta.write(&mut buf, &client.version.load()).unwrap();
+                    meta.write(&mut buf, &client.version.load()).expect("metadata serialization must not fail");
                 };
                 drop(config);
                 // END
@@ -2944,7 +2944,7 @@ impl World {
                             .load()
                             .squared_distance_to_vec(&pos),
                     )
-                    .unwrap()
+                    .unwrap_or(core::cmp::Ordering::Equal)
             })
             .cloned()
     }
@@ -2991,7 +2991,7 @@ impl World {
                     .load()
                     .squared_distance_to_vec(&pos)
                     .partial_cmp(&b.1.get_entity().pos.load().squared_distance_to_vec(&pos))
-                    .unwrap()
+                    .unwrap_or(core::cmp::Ordering::Equal)
             })
             .map(|p| p.1.clone())
     }
@@ -3134,7 +3134,7 @@ impl World {
                 let event = self
                     .server
                     .upgrade()
-                    .unwrap()
+                    .expect("server dropped during player leave event")
                     .plugin_manager
                     .fire(event)
                     .await;
@@ -3457,7 +3457,7 @@ impl World {
         let event = self
             .server
             .upgrade()
-            .unwrap()
+            .expect("server dropped during block break event")
             .plugin_manager
             .fire::<BlockBreakEvent>(event)
             .await;
@@ -3885,7 +3885,7 @@ impl World {
     pub async fn get_block_entity(&self, block_pos: &BlockPos) -> Option<Arc<dyn BlockEntity>> {
         self.level
             .get_or_fetch_chunk(block_pos.chunk_position(), |chunk| {
-                chunk.block_entities.lock().unwrap().get(block_pos).cloned()
+                chunk.block_entities.lock().expect("block_entities lock poisoned").get(block_pos).cloned()
             })
             .await
     }
@@ -3897,7 +3897,7 @@ impl World {
 
         if let Some(nbt) = &block_entity_nbt {
             let mut bytes = Vec::new();
-            to_bytes_unnamed(nbt, &mut bytes).unwrap();
+            to_bytes_unnamed(nbt, &mut bytes).expect("NBT serialization must not fail");
             self.broadcast_to_chunk(
                 chunk_pos,
                 &CBlockEntityData::new(
@@ -3914,7 +3914,7 @@ impl World {
                 chunk
                     .block_entities
                     .lock()
-                    .unwrap()
+                    .expect("block_entities lock poisoned")
                     .insert(block_pos, block_entity.clone());
                 chunk.mark_dirty(true);
             })
@@ -3927,7 +3927,7 @@ impl World {
                 if chunk
                     .block_entities
                     .lock()
-                    .unwrap()
+                    .expect("block_entities lock poisoned")
                     .remove(block_pos)
                     .is_some()
                 {
@@ -3944,7 +3944,7 @@ impl World {
 
         if let Some(nbt) = &block_entity_nbt {
             let mut bytes = Vec::new();
-            to_bytes_unnamed(nbt, &mut bytes).unwrap();
+            to_bytes_unnamed(nbt, &mut bytes).expect("NBT serialization must not fail");
             self.broadcast_to_chunk(
                 chunk_pos,
                 &CBlockEntityData::new(

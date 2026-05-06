@@ -52,7 +52,9 @@ impl EndPortal {
 
     async fn is_valid_portal(world: &World, pos: BlockPos) -> bool {
         for dir in BlockDirection::horizontal() {
-            let facing = dir.to_horizontal_facing().unwrap();
+            let Some(facing) = dir.to_horizontal_facing() else {
+                continue;
+            };
             let mid_pos = pos.offset_dir(dir.to_offset(), 2);
             let left_pos = mid_pos.offset_dir(facing.rotate_clockwise().to_offset(), 1);
             let right_pos = mid_pos.offset_dir(facing.rotate_counter_clockwise().to_offset(), 1);

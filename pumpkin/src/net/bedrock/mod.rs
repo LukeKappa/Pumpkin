@@ -796,7 +796,7 @@ impl BedrockClient {
                         0,
                         [SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 19132)); 10],
                         request.time,
-                        UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
+                        UNIX_EPOCH.elapsed().unwrap_or_default().as_millis() as u64,
                     ),
                     RakReliability::Unreliable,
                 )

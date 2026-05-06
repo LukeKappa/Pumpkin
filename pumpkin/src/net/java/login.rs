@@ -75,7 +75,14 @@ impl JavaClient {
             let id = if server.basic_config.online_mode {
                 login_start.uuid
             } else {
-                offline_uuid(&login_start.name).expect("This is very not safe and bad")
+                match offline_uuid(&login_start.name) {
+                    Ok(id) => id,
+                    Err(_) => {
+                        self.kick(TextComponent::text("Failed to generate offline UUID"))
+                            .await;
+                        return;
+                    }
+                }
             };
 
             let profile = GameProfile {
@@ -112,10 +119,13 @@ impl JavaClient {
         encryption_response: SEncryptionResponse,
     ) {
         debug!("Handling encryption");
-        let shared_secret = server
-            .decrypt(&encryption_response.shared_secret)
-            .await
-            .unwrap();
+        let shared_secret = match server.decrypt(&encryption_response.shared_secret).await {
+            Ok(secret) => secret,
+            Err(error) => {
+                self.kick(TextComponent::text(error.to_string())).await;
+                return;
+            }
+        };
 
         if let Err(error) = self.set_encryption(&shared_secret).await {
             self.kick(TextComponent::text(error.to_string())).await;
@@ -203,7 +213,10 @@ impl JavaClient {
             .clone();
         // We want to wait until we have sent the compression packet to the client
         self.send_packet_now(&CSetCompression::new(
-            compression.threshold.try_into().unwrap(),
+            compression
+                .threshold
+                .try_into()
+                .expect("compression threshold is too large"),
         ))
         .await;
         self.set_compression(compression).await;

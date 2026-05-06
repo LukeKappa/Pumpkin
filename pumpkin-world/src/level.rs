@@ -229,7 +229,7 @@ impl Level {
             level_ref.clone(),
             level_channel,
             listener,
-            level_ref.thread_tracker.lock().unwrap().as_mut(),
+            level_ref.thread_tracker.lock().expect("thread_tracker lock poisoned").as_mut(),
             gen_pool,
         );
 
@@ -304,7 +304,7 @@ impl Level {
         self.chunk_system_tasks.close();
 
         let handles = {
-            let mut lock = self.thread_tracker.lock().unwrap();
+            let mut lock = self.thread_tracker.lock().expect("thread_tracker lock poisoned");
             lock.drain(..).collect::<Vec<_>>()
         };
 
@@ -459,12 +459,12 @@ impl Level {
 
                 ticks
                     .block_entities
-                    .extend(chunk.block_entities.lock().unwrap().values().cloned());
+                    .extend(chunk.block_entities.lock().expect("block_entities lock poisoned").values().cloned());
 
                 // Use the bitmask to skip sections
                 let mask = chunk.section.randomly_ticking_mask.load(Ordering::Relaxed);
                 if mask != 0 {
-                    let sections = chunk.section.block_sections.read().unwrap();
+                    let sections = chunk.section.block_sections.read().expect("block_sections lock poisoned");
                     let min_y = chunk.section.min_y;
 
                     for i in 0..section_count {
@@ -576,7 +576,7 @@ impl Level {
         let recv = self.chunk_listener.add_single_chunk_listener(pos);
 
         {
-            let mut lock = self.chunk_loading.lock().unwrap();
+            let mut lock = self.chunk_loading.lock().expect("chunk_loading lock poisoned");
             lock.add_ticket(pos, 31);
             lock.send_change();
         };
@@ -586,7 +586,7 @@ impl Level {
             .expect("Chunk listener dropped without sending chunk");
 
         {
-            let mut lock = self.chunk_loading.lock().unwrap();
+            let mut lock = self.chunk_loading.lock().expect("chunk_loading lock poisoned");
             lock.remove_ticket(pos, 31);
             lock.send_change();
         };

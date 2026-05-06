@@ -674,7 +674,10 @@ impl JavaClient {
             return;
         }
 
-        let stack = ItemStack::new(1, Item::from_id(block.item_id).unwrap());
+        let stack = ItemStack::new(
+            1,
+            Item::from_id(block.item_id).expect("Invalid item ID for block"),
+        );
 
         let slot_with_stack = player.inventory().get_slot_with_stack(&stack).await;
 
@@ -743,8 +746,10 @@ impl JavaClient {
                 CommandBlockMode::Impulse => Block::COMMAND_BLOCK,
             };
 
-            let old_command_block: &CommandBlockEntity =
-                block_entity.as_any().downcast_ref().unwrap();
+            let old_command_block: &CommandBlockEntity = block_entity
+                .as_any()
+                .downcast_ref()
+                .expect("Failed to downcast to CommandBlockEntity");
 
             props.conditional = command.flags & 0x2 != 0;
 
@@ -1254,7 +1259,11 @@ impl JavaClient {
             PlayerInteractEvent::new(player, InteractAction::LeftClickAir, &Block::AIR, None)
         };
 
-        let server = player.world().server.upgrade().unwrap();
+        let server = player
+            .world()
+            .server
+            .upgrade()
+            .expect("Server dropped while handling block click");
 
         send_cancellable! {{
             server;
@@ -2233,7 +2242,7 @@ impl JavaClient {
             &sign_entity.back_text
         };
 
-        *text.messages.lock().unwrap() = [
+        *text.messages.lock().expect("lock poisoned") = [
             sign_data.line_1,
             sign_data.line_2,
             sign_data.line_3,
@@ -2540,8 +2549,12 @@ impl JavaClient {
 
         let response = CCommandSuggestions::new(
             packet.id,
-            (last_word_start + 2).try_into().unwrap(),
-            (cmd.len() - last_word_start - 1).try_into().unwrap(),
+            (last_word_start + 2)
+                .try_into()
+                .expect("suggestion start offset overflow"),
+            (cmd.len() - last_word_start - 1)
+                .try_into()
+                .expect("suggestion length overflow"),
             suggestions.into(),
         );
 

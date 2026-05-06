@@ -227,7 +227,7 @@ impl ChunkManager {
         let old_view_distance = self.view_distance;
 
         {
-            let mut lock = level.chunk_loading.lock().unwrap();
+            let mut lock = level.chunk_loading.lock().expect("chunk_loading lock poisoned");
             let new_level = ChunkLoading::get_level_from_view_distance(view_distance);
             lock.add_ticket(center, new_level);
 
@@ -281,7 +281,7 @@ impl ChunkManager {
     }
 
     pub fn clean_up(&mut self, level: &Arc<Level>) {
-        let mut lock = level.chunk_loading.lock().unwrap();
+        let mut lock = level.chunk_loading.lock().expect("chunk_loading lock poisoned");
         lock.remove_ticket(
             self.center,
             ChunkLoading::get_level_from_view_distance(self.view_distance),
@@ -300,7 +300,7 @@ impl ChunkManager {
     }
 
     pub fn change_world(&mut self, old_level: &Arc<Level>, new_world: Arc<World>) {
-        let mut lock = old_level.chunk_loading.lock().unwrap();
+        let mut lock = old_level.chunk_loading.lock().expect("chunk_loading lock poisoned");
         lock.remove_ticket(
             self.center,
             ChunkLoading::get_level_from_view_distance(self.view_distance),
@@ -508,7 +508,7 @@ impl Player {
 
         impl ScreenHandlerListener for ScreenListener {}
 
-        let server = world.server.upgrade().unwrap();
+        let server = world.server.upgrade().expect("server dropped during player init");
 
         let player_uuid = gameprofile.id;
 
@@ -570,7 +570,8 @@ impl Player {
             watched_section: AtomicCell::new(Cylindrical::new(
                 Vector2::new(0, 0),
                 // Since 1 is not possible in vanilla it is used as uninit
-                NonZeroU8::new(1).unwrap(),
+                // SAFETY: 1 is non-zero; this constant is used as a sentinel for "uninitialised"
+                NonZeroU8::new(1).expect("1 is non-zero; qed"),
             )),
             wait_for_keep_alive: AtomicBool::new(false),
             keep_alive_id: AtomicI64::new(0),
@@ -815,7 +816,7 @@ impl Player {
 
     pub async fn attack(&self, victim: Arc<dyn EntityBase>) {
         let world = self.world();
-        let server = world.server.upgrade().unwrap();
+        let server = world.server.upgrade().expect("server dropped during player attack");
         let victim_entity = victim.get_entity();
         let attacker_entity = &self.living_entity.entity;
         let config = &server.advanced_config.pvp;
@@ -2124,7 +2125,7 @@ impl Player {
 
         self.watched_section.store(Cylindrical::new(
             Vector2::new(0, 0),
-            NonZeroU8::new(1).unwrap(),
+            NonZeroU8::new(1).expect("1 is non-zero; qed"),
         ));
     }
 
@@ -2140,7 +2141,7 @@ impl Player {
         let yaw = yaw.unwrap_or(new_world.level_info.load().spawn_yaw);
         let pitch = pitch.unwrap_or(new_world.level_info.load().spawn_pitch);
 
-        let server = new_world.server.upgrade().unwrap();
+        let server = new_world.server.upgrade().expect("server dropped during world teleport");
 
         send_cancellable! {{
             server;
@@ -2162,7 +2163,8 @@ impl Player {
                 let new_world = event.new_world;
 
                 self.set_client_loaded(false);
-                let player = current_world.remove_player(self, false).await.unwrap();
+                let player = current_world.remove_player(self, false).await
+                    .expect("player should be in world during teleport_world");
                new_world.players.rcu(|current_list| {
                     let mut new_list = (**current_list).clone();
                     new_list.push(player.clone());
@@ -2223,7 +2225,7 @@ impl Player {
         // This is the ultra special magic code used to create the teleport id
         // This returns the old value
         // This operation wraps around on overflow.
-        let server = self.world().server.upgrade().unwrap();
+        let server = self.world().server.upgrade().expect("server dropped during respawn");
         send_cancellable! {{
             server;
             PlayerTeleportEvent {
@@ -2521,7 +2523,7 @@ impl Player {
         if self.gamemode.load() == gamemode {
             return false;
         }
-        let server = self.world().server.upgrade().unwrap();
+        let server = self.world().server.upgrade().expect("server dropped during teleport");
         send_cancellable! {{
             server;
             PlayerGamemodeChangeEvent {
@@ -3887,7 +3889,7 @@ impl EntityBase for Player {
                 // Same world
                 let yaw = yaw.unwrap_or(self.living_entity.entity.yaw.load());
                 let pitch = pitch.unwrap_or(self.living_entity.entity.pitch.load());
-                let server = self.world().server.upgrade().unwrap();
+                let server = self.world().server.upgrade().expect("server dropped during NBT save");
                 send_cancellable! {{
                     server;
                     PlayerTeleportEvent {

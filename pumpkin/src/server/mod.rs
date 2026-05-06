@@ -161,7 +161,9 @@ impl Server {
             let dat_path = world_path.join(LEVEL_DAT_FILE_NAME);
             if dat_path.exists() {
                 let backup_path = world_path.join(LEVEL_DAT_BACKUP_FILE_NAME);
-                fs::copy(dat_path, backup_path).unwrap();
+                if let Err(e) = fs::copy(&dat_path, &backup_path) {
+                    warn!("Failed to back up level.dat before load: {e}");
+                }
             }
         }
         let level_info = level_info.unwrap_or_else(|err| {
@@ -346,7 +348,7 @@ impl Server {
             world_guard.get(2)
         }
         .cloned()
-        .unwrap()
+        .expect("Requested dimension world is not loaded")
     }
 
     pub async fn create_world(self: &Arc<Self>, name: String, dimension: Dimension) -> Arc<World> {
