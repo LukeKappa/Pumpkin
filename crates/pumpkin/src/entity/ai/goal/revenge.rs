@@ -143,7 +143,7 @@ impl Goal for RevengeGoal {
         }
 
         let attacker_id = living.last_attacker_id.load(Relaxed);
-        if attacker_id == 0 {
+        if attacker_id == 0 || attacker_id == living.entity.entity_id {
             return false;
         }
 

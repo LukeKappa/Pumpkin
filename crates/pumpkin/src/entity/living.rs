@@ -2565,6 +2565,9 @@ impl LivingEntity {
     }
 
     pub fn can_attack(&self, target: &dyn EntityBase) -> bool {
+        if self.entity.entity_id == target.get_entity().entity_id {
+            return false;
+        }
         if target.get_player().is_some()
             && self.entity.world.load().level_info.load().difficulty == Difficulty::Peaceful
         {

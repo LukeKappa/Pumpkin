@@ -9,17 +9,20 @@ use crate::entity::{
     Entity, EntityBase,
     ai::goal::{
         active_target::ActiveTargetGoal, look_around::RandomLookAroundGoal,
-        look_at_entity::LookAtEntityGoal, swim::SwimGoal, wander_around::WanderAroundGoal,
+        look_at_entity::LookAtEntityGoal, revenge::RevengeGoal, swim::SwimGoal,
+        wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
 };
 
+/// Represents a Blaze mob entity in the game world.
 pub struct BlazeEntity {
     pub entity: Arc<MobEntity>,
     pub is_charged: AtomicBool,
 }
 
 impl BlazeEntity {
+    /// Creates and initializes a new [`BlazeEntity`].
     pub fn new(entity: Entity) -> Arc<Self> {
         let entity = Arc::new(MobEntity::new(entity));
         let blaze = Self {
@@ -61,6 +64,7 @@ impl BlazeEntity {
             );
             goal_selector.add_goal(8, Box::new(RandomLookAroundGoal::default()));
 
+            target_selector.add_goal(1, Box::new(RevengeGoal::new(true).alerting_others()));
             target_selector.add_goal(
                 2,
                 ActiveTargetGoal::with_default(&mob_arc.entity, &EntityType::PLAYER, true),
@@ -70,10 +74,12 @@ impl BlazeEntity {
         mob_arc
     }
 
+    /// Returns whether the blaze is currently charged (on fire during an attack).
     pub fn is_charged(&self) -> bool {
         self.is_charged.load(Ordering::Relaxed)
     }
 
+    /// Sets whether the blaze is charged and syncs the metadata flag.
     pub fn set_charged(&self, charged: bool) {
         self.is_charged.store(charged, Ordering::Relaxed);
         let flags = i8::from(charged);
